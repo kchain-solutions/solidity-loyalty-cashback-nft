@@ -1,0 +1,32 @@
+{
+  "name": "solidity-loyalty-cashback-nft",
+  "version": "1.0.0",
+  "description": "Loyalty cashback protocol using NFTs",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kchain-solutions/solidity-loyalty-cashback-nft.git"
+  },
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "nfts"
+  ],
+  "author": "Valerio Mellini",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kchain-solutions/solidity-loyalty-cashback-nft/issues"
+  },
+  "homepage": "https://github.com/kchain-solutions/solidity-loyalty-cashback-nft#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.8.0",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "hardhat": "^2.12.2"
+  }
+}
