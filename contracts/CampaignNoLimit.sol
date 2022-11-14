@@ -79,7 +79,7 @@ contract CampaignNoLimit is
         string externalResource;
     }
 
-    mapping(uint256 => NftStatus) private nftStatusMapper;
+    mapping(uint256 => NftStatus) public nftStatusMapper;
 
     constructor(
         address _owner,
