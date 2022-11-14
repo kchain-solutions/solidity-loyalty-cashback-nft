@@ -2,73 +2,45 @@
 pragma solidity ^0.8.7;
 
 contract UsersNftBalance {
-    mapping(address => uint256[]) private validTokens;
-    mapping(address => uint256[]) private notValidTokens;
+    mapping(address => uint256[]) private nfts;
     uint256[] private _tmpArray;
 
-    function _addItem(address owner, uint256 item) internal {
-        uint256[] storage q = validTokens[owner];
-        q.push(item);
+    function _addItem(address owner, uint256 tokenId) internal {
+        uint256[] storage q = nfts[owner];
+        q.push(tokenId);
     }
 
     function _moveItem(
         address owner,
-        uint256 itemId,
-        address to
+        address to,
+        uint256 tokenId
     ) internal returns (bool) {
-        uint256[] storage fromTokens = validTokens[owner];
-        uint256[] storage toTokens = validTokens[to];
+        uint256[] storage fromTokens = nfts[owner];
+        uint256[] storage toTokens = nfts[to];
         delete _tmpArray;
         bool flag = false;
         for (uint256 i = 0; i < fromTokens.length; i++) {
-            if (fromTokens[i] == itemId) {
-                toTokens.push(itemId);
+            if (fromTokens[i] == tokenId) {
+                toTokens.push(tokenId);
                 flag = true;
             } else {
                 _tmpArray.push(fromTokens[i]);
             }
         }
         if (flag) {
-            validTokens[owner] = _tmpArray;
+            nfts[owner] = _tmpArray;
         }
         return flag;
     }
 
     function _getFirstNFT(address owner) internal view returns (uint256) {
-        uint256[] memory vt = validTokens[owner];
+        uint256[] memory vt = nfts[owner];
         require(vt.length > 0, "No NFT in your balance");
         return vt[0];
     }
 
-    function getValidNFTs() public view returns (uint256[] memory) {
-        uint256[] memory q = validTokens[msg.sender];
+    function getNFTs() public view returns (uint256[] memory) {
+        uint256[] memory q = nfts[msg.sender];
         return q;
-    }
-
-    function getNotValidNFTs() public view returns (uint256[] memory) {
-        uint256[] memory q = notValidTokens[msg.sender];
-        return q;
-    }
-
-    function _dropNotValidTokens(address owner) internal {
-        delete notValidTokens[owner];
-    }
-
-    function _putInvalid(address owner, uint256 itemId) internal {
-        uint256[] storage validTokensArray = validTokens[owner];
-        uint256[] storage notValidTokensArray = notValidTokens[owner];
-        delete _tmpArray;
-        bool flag = false;
-        for (uint256 i = 0; i < validTokensArray.length; i++) {
-            if (validTokensArray[i] == itemId) {
-                notValidTokensArray.push(itemId);
-                flag = true;
-            } else {
-                _tmpArray.push(validTokensArray[i]);
-            }
-        }
-        if (flag) {
-            validTokens[owner] = _tmpArray;
-        }
     }
 }

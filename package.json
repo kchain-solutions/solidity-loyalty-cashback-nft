@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/kchain-solutions/solidity-loyalty-cashback-nft#readme",
   "dependencies": {
+    "@chainlink/contracts": "^0.5.1",
     "@openzeppelin/contracts": "^4.8.0",
     "dotenv": "^16.0.3"
   },

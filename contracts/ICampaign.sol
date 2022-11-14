@@ -4,8 +4,7 @@ pragma solidity ^0.8.7;
 interface ICampaign {
 
     function payWithNft(uint256 tokenId) external payable;
-    function cashOut() external payable;
     function mintNFT() external returns (uint256);
-    function changeOrderStatus(uint256 tokenId) external payable;
-    function getEthPrice(uint256 dollarPrice) external payable returns (uint256); 
+    function setProcessedStatus(string memory externalResource, uint256 tokenId) external payable;
+    function transfer(address recipient, uint256 tokenId) external payable returns (bool);
 }

@@ -4,18 +4,25 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./UsersNftBalance.sol";
 import "./ICampaign.sol";
+import "./IPriceOracle.sol";
+
+/*
+    Limited offer for infinite NFTs
+*/
 
 contract CampaignNoLimitFactory {
     address[] public campaignsCollection;
 
     function createCampaign(
+        IERC20 _token,
         string memory _name,
         string memory _symbol,
         string memory _URI,
-        uint96 _productprice,
+        uint256 _productprice,
         uint256 _remaningOffers,
         uint96 _campaignRoyaltiesPerc,
         uint96 _campaignCashbackPerc,
@@ -26,6 +33,7 @@ contract CampaignNoLimitFactory {
         contractAddress = address(
             new CampaignNoLimit(
                 msg.sender,
+                _token,
                 _name,
                 _symbol,
                 _URI,
@@ -43,13 +51,13 @@ contract CampaignNoLimitFactory {
 contract CampaignNoLimit is
     ERC721URIStorage,
     AccessControl,
-    UsersNftBalance,
-    ICampaign
+    ICampaign,
+    UsersNftBalance
 {
-    //Limited offer for infinite NFT
     using Counters for Counters.Counter;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     address payable public owner;
+    IERC20 token;
     uint256 public adminBalance;
     Counters.Counter private _tokenIds;
     uint256 public productPrice;
@@ -60,27 +68,28 @@ contract CampaignNoLimit is
     uint256 public endCampaign;
     string public URI;
 
-    enum ProcessPhase{
+    event Payed(address from, uint256 itemId);
+    event Processed(address to, uint256 itemId);
+
+    enum ProcessPhase {
         Minted,
         Payed,
         Processed
     }
 
     struct NftStatus {
-        address payable contractOwner;
-        address payable nftOwner;
-        address payable nftMinter;
+        address campaignOwner;
+        address customer;
+        address visibilityAdvisor;
         ProcessPhase processPhase;
+        string externalResource;
     }
 
-    mapping(uint256 => address payable) public royaltiesAddressMapper;
-    mapping(uint256 => bool) public tokenIsUsed;
-    
-
-    uint256 public mintingLimit;
+    mapping(uint256 => NftStatus) private nftStatusMapper;
 
     constructor(
         address _owner,
+        IERC20 _token,
         string memory _nftName,
         string memory _symbol,
         string memory _URI,
@@ -91,6 +100,7 @@ contract CampaignNoLimit is
         uint256 _endCampaign
     ) payable ERC721(_nftName, _symbol) {
         _setupRole(ADMIN_ROLE, _owner);
+        token = _token;
         productPrice = _productPrice;
         royaltiesPerc = _royaltiesPerc;
         cashbackPerc = _cashbackPerc;
@@ -101,61 +111,86 @@ contract CampaignNoLimit is
     }
 
     function mintNFT() public returns (uint256) {
-        //Require the campaign is still active
         uint256 newItemId = _tokenIds.current();
-        address payable NftOwner = payable(msg.sender);
 
-        _mint(NftOwner, newItemId);
+        _mint(msg.sender, newItemId);
         _setTokenURI(newItemId, URI);
         _addItem(msg.sender, newItemId);
-        royaltiesAddressMapper[newItemId] = NftOwner;
-        tokenIsUsed[newItemId] = false;
+
+        NftStatus memory nftStatus = NftStatus({
+            campaignOwner: owner,
+            customer: payable(address(0)),
+            visibilityAdvisor: payable(msg.sender),
+            processPhase: ProcessPhase.Minted,
+            externalResource: ""
+        });
+
+        nftStatusMapper[newItemId] = nftStatus;
         _tokenIds.increment();
 
         return newItemId;
     }
 
-    function cashOut() public payable {
-        require(hasRole(ADMIN_ROLE, msg.sender), "Only ADMIN can do cashout");
-        require(adminBalance > 0, "Not ETH available to cashOut");
-        owner.transfer(adminBalance);
-    }
-
-
     function payWithNft(uint256 tokenId) public payable {
-        //Require the campaign is active
-        require(msg.value == productPrice, "Pay the product price amount");
+        NftStatus storage nftStatus = nftStatusMapper[tokenId];
+        require(
+            nftStatus.processPhase == ProcessPhase.Minted,
+            "Token is not valid"
+        );
+        require(
+            token.balanceOf(msg.sender) == productPrice,
+            "Not enought funds available"
+        );
         require(
             ownerOf(tokenId) == msg.sender,
             "You're not the owner of the Item"
         );
-        require(tokenIsUsed[tokenId] == false, "Token is not valid anymore");
-        // When the remaningOffers reach zero the campaign is closed
-        require(remaningOffers >= 0, "The campaign is closed");
+        require(remaningOffers > 0, "The campaign is closed");
 
-        uint256 cashback = (msg.value * cashbackPerc) / 100;
-        uint256 royalties = (msg.value * royaltiesPerc) / 100;
-        uint256 adminRavenue = msg.value - cashback - royalties;
+        uint256 cashback = (productPrice * cashbackPerc) / 100;
+        uint256 royalties = (productPrice * royaltiesPerc) / 100;
+        uint256 ownerRavenue = productPrice - cashback - royalties;
 
-        if (royalties > 0) royaltiesAddressMapper[tokenId].transfer(royalties);
-        address payable cashbackAddress = payable(msg.sender);
+        token.approve(address(this), productPrice);
+
+        if (royalties > 0) {
+            token.transferFrom(
+                msg.sender,
+                nftStatus.visibilityAdvisor,
+                royalties
+            );
+        }
+
+        token.transferFrom(msg.sender, nftStatus.campaignOwner, ownerRavenue);
+
+        emit Payed(msg.sender, tokenId);
         remaningOffers = remaningOffers - 1;
-        if (cashback > 0) cashbackAddress.transfer(cashback);
-        if (adminRavenue > 0) owner.transfer(adminRavenue);
-
-        tokenIsUsed[tokenId] = true;
-        adminBalance = adminBalance + msg.value - cashback - royalties;
-        _putInvalid(msg.sender, tokenId);
+        nftStatus.processPhase = ProcessPhase.Payed;
     }
 
-    function transfer(address recipient, uint256 tokenId)
+    function transfer(address to, uint256 tokenId)
         public
         payable
         returns (bool)
     {
-        _transfer(_msgSender(), recipient, tokenId);
-        _moveItem(msg.sender, tokenId, recipient);
+        NftStatus storage nftStatus = nftStatusMapper[tokenId];
+        require(
+            nftStatus.processPhase == ProcessPhase.Minted,
+            "Not valid NFT to be transfered"
+        );
+        _transfer(_msgSender(), to, tokenId);
+        _moveItem(msg.sender, to, tokenId);
+        nftStatus.customer = to;
         return true;
+    }
+
+    function setProcessedStatus(string memory externalResource, uint256 tokenId) external payable override {
+        require(hasRole(ADMIN_ROLE, msg.sender), "Admin role required");
+        NftStatus storage nftStatus = nftStatusMapper[tokenId];
+        require(nftStatus.processPhase != ProcessPhase.Minted, "The item is not payed");
+        nftStatus.processPhase = ProcessPhase.Processed;
+        nftStatus.externalResource = externalResource;
+        emit Processed(nftStatus.customer, tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -166,14 +201,4 @@ contract CampaignNoLimit is
     {
         return super.supportsInterface(interfaceId);
     }
-
-
-    function changeOrderStatus(uint256 tokenId) external payable override {}
-
-    function getEthPrice(uint256 dollarPrice)
-        external
-        payable
-        override
-        returns (uint256)
-    {}
 }
