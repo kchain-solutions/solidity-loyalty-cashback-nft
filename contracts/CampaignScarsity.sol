@@ -4,19 +4,20 @@ pragma solidity ^0.8.7;
 import "./ICampaign.sol";
 
 contract CampaignScarsity is ICampaign {
-    
     function payWithNft(uint256 tokenId) external payable override {}
-
-    function cashOut() external payable override {}
 
     function mintNFT() external override returns (uint256) {}
 
-    function changeOrderStatus(uint256 tokenId) external payable override {}
-
-    function getEthPrice(uint256 dollarPrice)
+    function setProcessedStatus(string memory externalResource, uint256 tokenId)
         external
         payable
         override
-        returns (uint256)
+    {}
+
+    function transfer(address recipient, uint256 tokenId)
+        external
+        payable
+        override
+        returns (bool)
     {}
 }

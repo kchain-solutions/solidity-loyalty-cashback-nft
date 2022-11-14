@@ -6,13 +6,8 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./UsersNftBalance.sol";
 import "./ICampaign.sol";
 import "./IPriceOracle.sol";
-
-/*
-    Limited offer for infinite NFTs
-*/
 
 contract CampaignNoLimitFactory {
     address[] public campaignsCollection;
@@ -24,8 +19,8 @@ contract CampaignNoLimitFactory {
         string memory _URI,
         uint256 _productprice,
         uint256 _remaningOffers,
-        uint96 _campaignRoyaltiesPerc,
-        uint96 _campaignCashbackPerc,
+        uint96 _royaltiesPerc,
+        uint96 _cashbackPerc,
         uint256 _endCampaign
     ) public payable {
         address contractAddress;
@@ -39,8 +34,8 @@ contract CampaignNoLimitFactory {
                 _URI,
                 _productprice,
                 _remaningOffers,
-                _campaignRoyaltiesPerc,
-                _campaignCashbackPerc,
+                _royaltiesPerc,
+                _cashbackPerc,
                 _endCampaign
             )
         );
@@ -51,12 +46,11 @@ contract CampaignNoLimitFactory {
 contract CampaignNoLimit is
     ERC721URIStorage,
     AccessControl,
-    ICampaign,
-    UsersNftBalance
+    ICampaign
 {
     using Counters for Counters.Counter;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    address payable public owner;
+    address public owner;
     IERC20 token;
     uint256 public adminBalance;
     Counters.Counter private _tokenIds;
@@ -107,15 +101,15 @@ contract CampaignNoLimit is
         remaningOffers = _remaningOffers;
         URI = _URI;
         endCampaign = _endCampaign;
-        owner = payable(_owner);
+        owner = _owner;
     }
 
     function mintNFT() public returns (uint256) {
+        require(endCampaign > block.timestamp, "Campaign is ended");
+        require(remaningOffers > 0, "Offers are finished");
         uint256 newItemId = _tokenIds.current();
 
-        _mint(msg.sender, newItemId);
         _setTokenURI(newItemId, URI);
-        _addItem(msg.sender, newItemId);
 
         NftStatus memory nftStatus = NftStatus({
             campaignOwner: owner,
@@ -179,7 +173,6 @@ contract CampaignNoLimit is
             "Not valid NFT to be transfered"
         );
         _transfer(_msgSender(), to, tokenId);
-        _moveItem(msg.sender, to, tokenId);
         nftStatus.customer = to;
         return true;
     }
