@@ -12,10 +12,16 @@ function accounts() {
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.17",
-  networks: {
-    mumbai: {
-      url: MUMBAI_ENDPOINT,
-      accounts: accounts()
+  settings: {
+    optimizer: {
+      enabled: true,
+      runs: 1000,
+    },
+    networks: {
+      mumbai: {
+        url: MUMBAI_ENDPOINT,
+        accounts: accounts()
+      }
     }
   }
 };

@@ -2,17 +2,15 @@ const assert = require('assert');
 const { ethers } = require('hardhat');
 
 let tokenContract;
-let campaignOwnerInstance;
-let campaignVisibilityAdvisorInstance;
-let campaignCustomerInstance;
+let campaignFactoryContract;
 
 let owner;
 let customer;
 let visibilityAdvisor;
 
-const TOKEN_SUPPLY = 1000 * 10 ^ 18;
-const PRODUCT_PRICE = 10 * 10 ^ 18;
-const CUSTOMER_BALANCE = 100 * 10 ^ 18;
+const TOKEN_SUPPLY = ethers.utils.parseUnits("1000", 18);
+const PRODUCT_PRICE = ethers.utils.parseUnits("1", 18);
+const CUSTOMER_BALANCE = ethers.utils.parseUnits("100", 18);
 const REMANING_OFFERS = 99;
 const CASHBACK_PERC = 5;
 const ROYALTIES_PERC = 9;
@@ -31,9 +29,10 @@ describe("Testing campaign NoLimit", () => {
 
         await tokenContract.transfer(customer.address, CUSTOMER_BALANCE);
 
-        const campaignFactory = await ethers.getContractFactory("CampaignNoLimitFactory");
-        const campaignFactoryContract = await campaignFactory.deploy();
-        const campaignNoLimitAddress = await campaignFactoryContract.createCampaign(
+        //const campaignFactory = await ethers.getContractFactory("CampaignNoLimitFactory");
+        const campaignFactory = await ethers.getContractFactory("CampaignNoLimit");
+        campaignFactoryContract = await campaignFactory.deploy(
+            owner.address,
             tokenContract.address,
             "Campaign NoLimit",
             "CPM",
@@ -45,30 +44,66 @@ describe("Testing campaign NoLimit", () => {
             END_CAMPAIGN
         );
 
-        let campaign = await ethers.getContractFactory("CampaignNoLimit");
-        campaignOwnerInstance = await new ethers.Contract(campaignNoLimitAddress, campaign.interface, owner);
-        campaignVisibilityAdvisorInstance = await new ethers.Contract(campaignNoLimitAddress, campaign.interface, visibilityAdvisor);
-        campaignCustomerInstance = await new ethers.Contract(campaignNoLimitAddress, campaign.interface, customer);
-
     });
 
     it("Check users balances", async () => {
-        assert.equal(await tokenContract.balanceOf(customer.address), CUSTOMER_BALANCE);
-        assert.equal(await tokenContract.balanceOf(owner.address), TOKEN_SUPPLY - CUSTOMER_BALANCE);
+        let ownerBalance = ethers.utils.formatUnits(await tokenContract.balanceOf(owner.address), 18);
+        let userBalance = ethers.utils.formatUnits(await tokenContract.balanceOf(customer.address), 18);
+        let tsupply = ethers.utils.formatUnits(TOKEN_SUPPLY, 18);
+        let cbalance = ethers.utils.formatUnits(CUSTOMER_BALANCE, 18);
+        console.log("balance \n", ownerBalance, tsupply, cbalance);
+        assert.equal(userBalance, cbalance);
+        assert.equal(ownerBalance, tsupply - cbalance);
+        assert(userBalance > ethers.utils.formatUnits(PRODUCT_PRICE, 18));
     });
 
     it(("Create campaign test"), async () => {
-        assert(campaignOwnerInstance);
-        assert(campaignVisibilityAdvisorInstance);
-        assert(campaignCustomerInstance);
+        assert(campaignFactoryContract);
     });
 
     it("Minting test", async () => {
-        console.log(campaignVisibilityAdvisorInstance);
-        let a = await campaignVisibilityAdvisorInstance.mintNFT();
-        let b = await campaignVisibilityAdvisorInstance.mintNFT();
-        assert.equal(a, 0);
-        assert.equal(b, 1);
+        vcontract = await campaignFactoryContract.connect(visibilityAdvisor);
+        await vcontract.mintNFT();
+        let nftStatusMapper = await campaignFactoryContract.nftStatusMapper(0);
+        assert.equal(nftStatusMapper.visibilityAdvisor, visibilityAdvisor.address);
     });
+
+    it("Transfer token", async () => {
+        let vcontract = await campaignFactoryContract.connect(visibilityAdvisor);
+        await vcontract.mintNFT();
+        await vcontract.transfer(customer.address, 0);
+        let nftStatusMapper = await campaignFactoryContract.nftStatusMapper(0);
+        assert.equal(nftStatusMapper.visibilityAdvisor, visibilityAdvisor.address);
+        assert.equal(nftStatusMapper.customer, customer.address);
+    });
+
+    it("Pay with token", async () => {
+        let vcontract = await campaignFactoryContract.connect(visibilityAdvisor);
+        await vcontract.mintNFT();
+        await vcontract.transfer(customer.address, 0);
+        let nftStatusMapper = await campaignFactoryContract.nftStatusMapper(0);
+
+        let ccontract = await campaignFactoryContract.connect(customer);
+
+        let ctoken = await tokenContract.connect(customer);
+        await ctoken.approve(ccontract.address, CUSTOMER_BALANCE)
+        await ccontract.payWithNFT(0);
+
+        nftStatusMapper = await campaignFactoryContract.nftStatusMapper(0);
+
+        assert.equal(nftStatusMapper.visibilityAdvisor, visibilityAdvisor.address);
+        assert.equal(nftStatusMapper.customer, customer.address);
+        assert.equal(nftStatusMapper.processPhase, 1);
+        let customer_balance = await ctoken.balanceOf(customer.address);
+
+        let cashback = PRODUCT_PRICE.mul(ethers.BigNumber.from(CASHBACK_PERC)).div(ethers.BigNumber.from("100"));
+        let expected = CUSTOMER_BALANCE.sub(PRODUCT_PRICE).add(cashback);
+
+        let royalties = ethers.utils.formatUnits(PRODUCT_PRICE.mul(ethers.BigNumber.from(ROYALTIES_PERC)).div(ethers.BigNumber.from("100")), 18);
+        let visibilityAdvisorBalance = ethers.utils.formatUnits(await ctoken.balanceOf(visibilityAdvisor.address), 18);
+        assert.equal(ethers.utils.formatUnits(customer_balance, 18), ethers.utils.formatUnits(CUSTOMER_BALANCE.sub(PRODUCT_PRICE).add(cashback), 18));
+        assert.equal(visibilityAdvisorBalance, royalties);
+
+    })
 
 });

@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./ICampaign.sol";
 import "./IPriceOracle.sol";
 
+import "hardhat/console.sol";
+
 contract CampaignNoLimitFactory {
     address[] public campaignsCollection;
 
@@ -22,7 +24,7 @@ contract CampaignNoLimitFactory {
         uint96 _royaltiesPerc,
         uint96 _cashbackPerc,
         uint256 _endCampaign
-    ) public payable {
+    ) public {
         address contractAddress;
 
         contractAddress = address(
@@ -40,6 +42,10 @@ contract CampaignNoLimitFactory {
             )
         );
         campaignsCollection.push(contractAddress);
+    }
+
+    function getCampaigns() public view returns(address[] memory){
+        return campaignsCollection;
     }
 }
 
@@ -104,17 +110,18 @@ contract CampaignNoLimit is
         owner = _owner;
     }
 
-    function mintNFT() public returns (uint256) {
+    function mintNFT() public override returns (uint256) {
         require(endCampaign > block.timestamp, "Campaign is ended");
         require(remaningOffers > 0, "Offers are finished");
         uint256 newItemId = _tokenIds.current();
 
+        _mint(msg.sender, newItemId);
         _setTokenURI(newItemId, URI);
 
         NftStatus memory nftStatus = NftStatus({
             campaignOwner: owner,
-            customer: payable(address(0)),
-            visibilityAdvisor: payable(msg.sender),
+            customer: address(0),
+            visibilityAdvisor: msg.sender,
             processPhase: ProcessPhase.Minted,
             externalResource: ""
         });
@@ -125,14 +132,14 @@ contract CampaignNoLimit is
         return newItemId;
     }
 
-    function payWithNft(uint256 tokenId) public payable {
+    function payWithNFT(uint256 tokenId) external override{
         NftStatus storage nftStatus = nftStatusMapper[tokenId];
         require(
             nftStatus.processPhase == ProcessPhase.Minted,
             "Token is not valid"
         );
         require(
-            token.balanceOf(msg.sender) == productPrice,
+            token.balanceOf(msg.sender) >= productPrice,
             "Not enought funds available"
         );
         require(
@@ -145,8 +152,6 @@ contract CampaignNoLimit is
         uint256 royalties = (productPrice * royaltiesPerc) / 100;
         uint256 ownerRavenue = productPrice - cashback - royalties;
 
-        token.approve(address(this), productPrice);
-
         if (royalties > 0) {
             token.transferFrom(
                 msg.sender,
@@ -156,15 +161,15 @@ contract CampaignNoLimit is
         }
 
         token.transferFrom(msg.sender, nftStatus.campaignOwner, ownerRavenue);
-
+    
         emit Payed(msg.sender, tokenId);
         remaningOffers = remaningOffers - 1;
         nftStatus.processPhase = ProcessPhase.Payed;
     }
 
     function transfer(address to, uint256 tokenId)
-        public
-        payable
+        external
+        override
         returns (bool)
     {
         NftStatus storage nftStatus = nftStatusMapper[tokenId];
@@ -177,7 +182,7 @@ contract CampaignNoLimit is
         return true;
     }
 
-    function setProcessedStatus(string memory externalResource, uint256 tokenId) external payable override {
+    function setProcessedStatus(string memory externalResource, uint256 tokenId) external override {
         require(hasRole(ADMIN_ROLE, msg.sender), "Admin role required");
         NftStatus storage nftStatus = nftStatusMapper[tokenId];
         require(nftStatus.processPhase != ProcessPhase.Minted, "The item is not payed");
