@@ -7,9 +7,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./ICampaign.sol";
-import "./IPriceOracle.sol";
-
-import "hardhat/console.sol";
 
 contract CampaignNoLimitFactory {
     address[] public campaignsCollection;
