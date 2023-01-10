@@ -48,11 +48,9 @@ contract CampaignNoLimitFactory {
 
 contract CampaignNoLimit is
     ERC721URIStorage,
-    AccessControl,
     ICampaign
 {
     using Counters for Counters.Counter;
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     address public owner;
     IERC20 token;
     uint256 public adminBalance;
@@ -96,7 +94,6 @@ contract CampaignNoLimit is
         uint96 _cashbackPerc,
         uint256 _endCampaign
     ) payable ERC721(_nftName, _symbol) {
-        _setupRole(ADMIN_ROLE, _owner);
         token = _token;
         productPrice = _productPrice;
         royaltiesPerc = _royaltiesPerc;
@@ -180,7 +177,7 @@ contract CampaignNoLimit is
     }
 
     function setProcessedStatus(string memory externalResource, uint256 tokenId) external override {
-        require(hasRole(ADMIN_ROLE, msg.sender), "Admin role required");
+        require(msg.sender == owner, "Owner role required");
         NftStatus storage nftStatus = nftStatusMapper[tokenId];
         require(nftStatus.processPhase != ProcessPhase.Minted, "The item is not payed");
         nftStatus.processPhase = ProcessPhase.Processed;
@@ -191,7 +188,7 @@ contract CampaignNoLimit is
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, AccessControl)
+        override(ERC721)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
