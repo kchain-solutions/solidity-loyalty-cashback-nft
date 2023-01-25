@@ -5,10 +5,7 @@ async function main() {
 
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    const Token = await ethers.getContractFactory("PriceOracle");
-    const token = await Token.deploy();
-
-    console.log("Price oracle address:", token.address);
+    //TBD
 }
 
 main()

@@ -16,12 +16,12 @@ module.exports = {
     optimizer: {
       enabled: true,
       runs: 1000,
-    },
-    networks: {
-      mumbai: {
-        url: MUMBAI_ENDPOINT,
-        accounts: accounts()
-      }
+    }
+  },
+  networks: {
+    mumbai: {
+      url: MUMBAI_ENDPOINT,
+      accounts: accounts()
     }
   }
 };
