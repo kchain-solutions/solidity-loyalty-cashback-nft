@@ -5,7 +5,10 @@ async function main() {
 
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    //TBD
+    const CampaignNoLimitFactory = await ethers.getContractFactory("CampaignNoLimitFactory");
+    const campaignNoLimitFactory = await CampaignNoLimitFactory.deploy();
+
+    console.log("campaignNoLimitFactory address:", campaignNoLimitFactory.address);
 }
 
 main()
